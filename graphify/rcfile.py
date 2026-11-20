@@ -31,11 +31,15 @@ typos from silently disabling classification.
 """
 from __future__ import annotations
 
+import os
 import sys
 import threading
 from pathlib import Path
 
 RC_FILENAME = ".graphifyrc"
+# Per-run overrides from the caller (the service), merged over the repo's own .graphifyrc; this wins on a clash.
+# Same value rules as ``language.<ext>=``: ``GRAPHIFY_LANGUAGE_OVERRIDES="tpl=ts,inc=php"``.
+ENV_LANGUAGE_OVERRIDES = "GRAPHIFY_LANGUAGE_OVERRIDES"
 
 # Language name -> the canonical extension graphify dispatches it under.
 # Deliberately a short list of names a user is likely to type; any known
@@ -224,13 +228,26 @@ def get_language_overrides() -> dict[str, str]:
     return dict(_active())
 
 
+def parse_env_overrides(raw: str) -> dict[str, str]:
+    """``"tpl=ts,inc=php"`` -> ``{".tpl": ".ts", ".inc": ".php"}``. Raises ``ValueError`` on a bad pair."""
+    out: dict[str, str] = {}
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        ext, sep, target = part.partition("=")
+        if not sep or not ext.strip():
+            raise ValueError(f"expected ext=language, got {part!r}")
+        out[_normalise_ext(ext)] = parse_language_value(target)
+    return out
+
+
 def activate_language_overrides(root: Path) -> dict[str, str]:
     """Load ``<root>/.graphifyrc`` and make its language overrides active.
 
-    A malformed file is reported once per root on stderr and treated as
-    having no overrides — a scan must not die on a config typo, but the
-    user must hear about it, or their ``.inc`` silently stays Pascal.
-    Returns the mapping now active.
+    ``GRAPHIFY_LANGUAGE_OVERRIDES`` (see :data:`ENV_LANGUAGE_OVERRIDES`) is merged on top, and wins on a clash.
+    A malformed file or variable is reported once on stderr and ignored: a scan must not die on a config typo, but
+    the user must hear about it, or their ``.inc`` silently stays Pascal. Returns the mapping now active.
     """
     try:
         cfg = load_graphifyrc(Path(root))
@@ -240,7 +257,17 @@ def activate_language_overrides(root: Path) -> dict[str, str]:
             _warned_roots.add(key)
             print(f"[graphify] warning: ignoring {RC_FILENAME}: {exc}", file=sys.stderr)
         cfg = {}
-    set_language_overrides(cfg.get("languages"))
+    languages = dict(cfg.get("languages") or {})
+    raw_env = os.environ.get(ENV_LANGUAGE_OVERRIDES, "").strip()
+    if raw_env:
+        try:
+            languages.update(parse_env_overrides(raw_env))
+        except ValueError as exc:
+            key = f"env:{raw_env}"
+            if key not in _warned_roots:
+                _warned_roots.add(key)
+                print(f"[graphify] warning: ignoring {ENV_LANGUAGE_OVERRIDES}: {exc}", file=sys.stderr)
+    set_language_overrides(languages or None)
     return get_language_overrides()
 
 
