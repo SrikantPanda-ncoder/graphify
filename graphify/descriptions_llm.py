@@ -81,6 +81,7 @@ RETRIES = 6  # transient provider errors (rate limits, timeouts, 5xx): wait and 
 
 def _ask(prompt: str, backend: str, usage: dict) -> dict:
     import time
+    from graphify.gateway import GatewayPermanentError
     from graphify.llm import _call_llm
     last = None
     for attempt in range(RETRIES):
@@ -88,6 +89,9 @@ def _ask(prompt: str, backend: str, usage: dict) -> dict:
             text = _call_llm(prompt, backend=backend, max_tokens=MAX_TOKENS, usage_out=usage)
             return _parse(text)
         except ReplyParseError:
+            raise
+        except (ImportError, GatewayPermanentError):
+            # A missing module or a setting that is wrong or absent: waiting will not change it. Fail now.
             raise
         except Exception as exc:  # provider errors; a parse failure is handled by the caller
             last = exc

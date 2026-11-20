@@ -13,10 +13,24 @@ from __future__ import annotations
 import json
 import os
 import re
+import urllib.error
+import urllib.request
 
 SIMULATED_SYMBOL = "Simulated description of this symbol."  # kept for callers that want a fixed text
 SIMULATED_GROUP = "Simulated description of this group."
 SIMULATED_NAME = "Simulated Group"
+
+
+class GatewayPermanentError(RuntimeError):
+    """A gateway failure that a retry cannot fix: missing settings, or a 4xx answer (bad key, unknown model)."""
+
+
+class GatewayConfigError(GatewayPermanentError):
+    """LITELLM_BASE_URL, LITELLM_API_KEY or GRAPHIFY_CUSTOMER_ID is missing."""
+
+
+class GatewayRejectedError(GatewayPermanentError):
+    """The gateway answered 4xx (other than 408 and 429): the same request will fail again."""
 
 
 def simulation_on() -> bool:
@@ -49,25 +63,32 @@ def call_gateway(prompt: str, *, max_tokens: int = 200, usage_out: dict | None =
     """One chat completion through the gateway, or the simulated reply. Returns the reply text."""
     if simulation_on():
         return simulated_reply(prompt)
-    import requests
 
     base = os.environ.get("LITELLM_BASE_URL", "").strip().rstrip("/")
     key = os.environ.get("LITELLM_API_KEY", "").strip()
     customer = os.environ.get("GRAPHIFY_CUSTOMER_ID", "").strip()
     if not (base and key):
-        raise RuntimeError("LITELLM_BASE_URL and LITELLM_API_KEY are required unless LLM_SIMULATION=true")
+        raise GatewayConfigError("LITELLM_BASE_URL and LITELLM_API_KEY are required unless LLM_SIMULATION=true")
     if not customer:
-        raise RuntimeError("GRAPHIFY_CUSTOMER_ID is required: every gateway call is attributed to a customer")
+        raise GatewayConfigError("GRAPHIFY_CUSTOMER_ID is required: every gateway call is attributed to a customer")
     model = os.environ.get("GRAPHIFY_MODEL", "gemini-2.5-flash").strip()
-    resp = requests.post(
+    payload = json.dumps({
+        "model": model, "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0, "max_tokens": max_tokens, "user": customer,
+    }).encode("utf-8")
+    req = urllib.request.Request(
         f"{base}/chat/completions",
+        data=payload,
+        method="POST",
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-        json={"model": model, "messages": [{"role": "user", "content": prompt}],
-              "temperature": 0, "max_tokens": max_tokens, "user": customer},
-        timeout=120,
     )
-    resp.raise_for_status()
-    body = resp.json()
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        if exc.code in (408, 429) or exc.code >= 500:
+            raise RuntimeError(f"gateway answered {exc.code}; transient") from None
+        raise GatewayRejectedError(f"gateway answered {exc.code}; the same request will fail again") from None
     if usage_out is not None:
         usage = body.get("usage") or {}
         usage_out["input"] = usage_out.get("input", 0) + int(usage.get("prompt_tokens", 0) or 0)
