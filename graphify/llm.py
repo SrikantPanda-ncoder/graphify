@@ -3249,6 +3249,9 @@ def _call_llm(
     exist in this module, so the LLM tiebreaker silently no-op'd on
     `ImportError` (F-038). Adding the function here re-enables it.
     """
+    if backend == "gateway":
+        from .gateway import call_gateway
+        return call_gateway(prompt, max_tokens=max_tokens, usage_out=usage_out)
     if backend not in BACKENDS:
         raise ValueError(f"Unknown backend {backend!r}")
     ollama_seed = _resolve_ollama_seed() if backend == "ollama" else None
