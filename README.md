@@ -97,7 +97,39 @@ Install the tagged version: `graphifyy @ git+https://github.com/SrikantPanda-nco
 
 **Outputs:** every node has `start_line` and `end_line` (`null` when unknown). With `--describe` the graph also has a top-level `communities` list (`id`, `name`, `description`, `size`, `members`) and a `description` on each node. Descriptions are cached in `descriptions_cache.json` in the output folder.
 
-**Run a parse:** `python ncoder/graphify_cli.py <repo> <out_dir> [resolution] [ignore_file] [--describe]`, from this repository's root, with the checkout on `PYTHONPATH` (or the package installed). The default ignore file is `ncoder/graphignore/common.graphifyignore`. Use `GRAPHIFY_BACKEND=gateway LLM_SIMULATION=true` with `--describe` for simulated descriptions, or the gateway variables above for real ones. The script works on a copy of the repo, so the repo itself is not modified.
+### Setup (fresh environment)
+
+Needs [uv](https://docs.astral.sh/uv/) and Python 3.13 (uv installs it if missing). From this repository's root:
+
+```bash
+uv venv --python 3.13 .venv
+uv pip install --python .venv/bin/python -r requirements.txt
+```
+
+This installs graphify from this checkout (`-e .`), the Leiden pin `graspologic-native==1.3.1`, and pytest. The `.venv/` folder is git-ignored. To check the setup: `.venv/bin/python -m pytest tests`.
+
+### Parse a repository
+
+```bash
+.venv/bin/python ncoder/graphify_cli.py <repo_dir_or_github_url> <out_dir> [resolution] [ignore_file] [--describe]
+```
+
+- **Input:** a local folder, or a GitHub address such as `https://github.com/nCoderAI/ncoder-ai.git`. A GitHub address is cloned (shallow) into `<out_dir>/source` on every run.
+- **Output:** `<out_dir>/graph.json`. With `--describe`, also `communities` and a `description` on each node, cached in `descriptions_cache.json`.
+- **Resolution:** the clustering resolution, default `1.0`.
+- **Ignore file:** default `ncoder/graphignore/common.graphifyignore`. Pass another file as the fourth argument.
+- **Descriptions:** without `--describe` there are none. With it, set one of these:
+  - Simulated (no network, no cost): `GRAPHIFY_BACKEND=gateway LLM_SIMULATION=true`.
+  - Real model: `GRAPHIFY_BACKEND=gateway` with `LITELLM_BASE_URL`, `LITELLM_API_KEY`, `GRAPHIFY_CUSTOMER_ID` and, optionally, `GRAPHIFY_MODEL`. Real calls are billed.
+
+Example, simulated descriptions of the React repo at a local path:
+
+```bash
+GRAPHIFY_BACKEND=gateway LLM_SIMULATION=true .venv/bin/python ncoder/graphify_cli.py \
+  ~/react-workspaces/ncoder-ai ~/react-workspaces/ncoder-ai-described --describe
+```
+
+The script copies the repo to a temporary folder before reading it, so the repo itself is not modified.
 
 ---
 

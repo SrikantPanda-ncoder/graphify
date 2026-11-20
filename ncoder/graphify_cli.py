@@ -1,12 +1,13 @@
 """Builds graphify's graph.json for one checkout, with no LLM. Run as a script, in the graphify interpreter.
 
-    python graphify_cli.py <checkout_dir> <out_dir> [resolution] [ignore_file] [--describe]
+    python ncoder/graphify_cli.py <repo_dir_or_github_url> <out_dir> [resolution] [ignore_file] [--describe]
+
+The input is a local folder, or a GitHub https address that is cloned into <out_dir>/source. The output folder gets
+graph.json. The default ignore file is ncoder/graphignore/common.graphifyignore, found next to this script.
 
 With --describe, graphify's description steps run after the graph is built, through the gateway backend
 (graphify/gateway.py in this repository). LLM_SIMULATION=true makes them return simulated text, with no network.
-
-The ignore file is ncoder/graphignore/common.graphifyignore, found next to this script. Run from the repository root
-with this checkout on PYTHONPATH, or with the graphifyy package installed.
+See README.md for the environment setup.
 
 Standalone on purpose: it imports only graphify and the standard library, never the app package, so the graphify
 interpreter does not need the service's environment. Mirrors react_parser/ncoder_react_parser/build_graph.py build()
@@ -18,6 +19,7 @@ from __future__ import annotations
 import contextlib
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -92,21 +94,39 @@ def describe(graph_path: Path, checkout: Path) -> dict:
     return report
 
 
+GITHUB_PREFIX = "https://github.com/"
+
+
+def resolve_checkout(arg: str, out_dir: Path) -> Path:
+    """The repository to parse: a local folder as given, or a GitHub https address cloned (shallow, fresh each run)
+    into <out_dir>/source, so the source that was parsed sits beside the output."""
+    if not arg.startswith(GITHUB_PREFIX):
+        return Path(arg).resolve()
+    target = out_dir / "source"
+    if target.exists():
+        shutil.rmtree(target)
+    env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
+    subprocess.run(["git", "clone", "--depth", "1", arg, str(target)], check=True, env=env)
+    return target
+
+
 def main(argv: list[str]) -> int:
     import json
 
     do_describe = "--describe" in argv
     argv = [a for a in argv if a != "--describe"]
     if len(argv) < 3:
-        print("usage: graphify_cli.py <checkout_dir> <out_dir> [resolution] [ignore_file] [--describe]", file=sys.stderr)
+        print("usage: graphify_cli.py <repo_dir_or_github_url> <out_dir> [resolution] [ignore_file] [--describe]",
+              file=sys.stderr)
         return 2
-    checkout, out_dir = Path(argv[1]).resolve(), Path(argv[2]).resolve()
+    out_dir = Path(argv[2]).resolve()
     resolution = float(argv[3]) if len(argv) > 3 else 1.0
     ignore_file = Path(argv[4]) if len(argv) > 4 else DEFAULT_IGNORE
+    out_dir.mkdir(parents=True, exist_ok=True)
+    checkout = resolve_checkout(argv[1], out_dir)
     if not checkout.is_dir():
         print(f"checkout not found: {checkout}", file=sys.stderr)
         return 2
-    out_dir.mkdir(parents=True, exist_ok=True)
     # graphify's community naming and its caches resolve paths against the current directory. Run from the output
     # folder, so a run started inside a repository never leaves graphify-out/ in that repository.
     with contextlib.chdir(out_dir):
