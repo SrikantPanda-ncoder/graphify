@@ -123,7 +123,20 @@ def main(argv: list[str]) -> int:
         if do_describe:
             report = describe(graph_path, checkout)
             print("DESCRIBE " + json.dumps(report, default=str), file=sys.stderr)
+    print(summarize(graph_path), file=sys.stderr)
     return 0
+
+
+def summarize(graph_path: Path) -> str:
+    """One line with the counts in graph.json, printed last so it is the final line of a run."""
+    import json
+
+    g = json.loads(Path(graph_path).read_text())
+    nodes = g.get("nodes", [])
+    edges = g.get("links", g.get("edges", []))
+    described = sum(1 for n in nodes if n.get("description"))
+    communities = len(g.get("communities") or [])
+    return f"SUMMARY nodes={len(nodes)} edges={len(edges)} communities={communities} described={described}"
 
 
 if __name__ == "__main__":
