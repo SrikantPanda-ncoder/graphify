@@ -40,7 +40,8 @@ def simulation_on() -> bool:
 def simulated_reply(prompt: str) -> str:
     """A JSON object shaped like the reply each graphify prompt asks for: descriptions (per node or group), or community
     names (one name per "<community id>: members" line)."""
-    if "naming clusters in a knowledge graph" in prompt:
+    # Decide by the prompt's opening line only: code snippets inside a batch can contain these phrases.
+    if prompt.lstrip().startswith("You are naming clusters in a knowledge graph"):
         ids = re.findall(r"^(-?\d+): ", prompt, re.M)
         return json.dumps({i: f"{SIMULATED_NAME} {i}" for i in ids})
     reply = {}
