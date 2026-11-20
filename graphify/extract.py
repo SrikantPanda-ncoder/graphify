@@ -13539,6 +13539,16 @@ def extract(
 
     _stamp_cpp_condition_provenance(all_nodes, all_edges)
 
+    # React/TypeScript relations (renders, calls_hook, uses_store, route_renders, tested_by,
+    # uses_gql_operation), added to the AST graph before it is built and deduplicated, as
+    # every other edge is. Off unless GRAPHIFY_TS_RELATIONS=1.
+    from graphify import ts_relations as _ts_rel
+    if _ts_rel.enabled():
+        try:
+            _ts_counts = _ts_rel.add_ts_relations(paths, root, all_nodes, all_edges)
+            print(f"[graphify] ts_relations: {_ts_counts}", file=sys.stderr)
+        except Exception as _exc:  # never break extraction
+            print(f"[graphify] ts_relations failed: {_exc!r}", file=sys.stderr)
 
     _fill_line_spans(all_nodes, root)
 
