@@ -79,6 +79,12 @@ Compared with the 0.9.108 wheel, the package has:
 - **`requests` was not declared.** The gateway now uses `urllib` from the standard library, so a fresh install needs no extra package.
 - **Permanent errors were retried.** A missing module, a missing gateway setting or a 4xx answer now fails at once (`GatewayPermanentError` and its subclasses). 429, 5xx and network errors are still retried. A sample run with no keys failed in under a second instead of about six minutes.
 
+## Since `0.9.108+ncoder.3` (not yet tagged)
+
+- **The description cache is keyed by mode.** `cache_mode` gives `simulated`, `offline` or `gateway:<model>`, and it is part of every cache key. A run in one mode no longer reuses descriptions written in another. Caches written before this change are not read.
+- **The run script takes a local folder only.** A GitHub address is refused with a message. Clone the repository first.
+- **The run script prints the graph size.** `graph: <nodes> nodes, <edges> edges, <communities> communities`.
+
 ## Not code
 
 - `extractors/MIGRATION.md`: the upstream playbook for moving language extractors out of `extract.py`. Upstream includes it in the repository but not in the wheel.

@@ -59,8 +59,23 @@ def _snippet(root: Path, node: dict) -> str:
     return "\n".join(chunk)[:SNIP_CHARS]
 
 
-def _key(node: dict, code: str) -> str:
-    return hashlib.sha256(f"{VERSION}|{node['id']}|{code}".encode()).hexdigest()
+def cache_mode(backend: str) -> str:
+    """What produced a description. It is part of every cache key, so a cache written in one mode is never read
+    in another: 'simulated' (LLM_SIMULATION), 'offline' (templates), or 'gateway:<model>' (real calls)."""
+    from graphify.gateway import simulation_on
+
+    name = backend.strip().lower()
+    if name in OFFLINE_BACKENDS:
+        return "offline"
+    if name == "gateway" and simulation_on():
+        return "simulated"
+    if name == "gateway":
+        return "gateway:" + (os.environ.get("GRAPHIFY_MODEL", "").strip() or "gemini-2.5-flash")
+    return name
+
+
+def _key(node: dict, code: str, mode: str) -> str:
+    return hashlib.sha256(f"{VERSION}|{mode}|{node['id']}|{code}".encode()).hexdigest()
 
 
 def _parse(text: str) -> dict:
@@ -205,9 +220,10 @@ def generate(graph_json: str, root=None) -> tuple[dict, dict]:
     cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
 
     pending, node_text, why_text = [], {}, {}
+    mode = cache_mode(backend)
     for n in nodes:  # every node is described, trivial and test nodes included
         code = _snippet(root, n)
-        k = _key(n, code)
+        k = _key(n, code, mode)
         wants_why = _wants_why(n)
         k = k + "|why" if wants_why else k
         if k in cache:

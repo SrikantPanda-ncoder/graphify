@@ -111,18 +111,19 @@ This installs graphify from this checkout (`-e .`), the Leiden pin `graspologic-
 ### Parse a repository
 
 ```bash
-.venv/bin/python ncoder/graphify_cli.py <repo_dir_or_github_url> <out_dir> [resolution] [ignore_file] [--describe]
+.venv/bin/python ncoder/graphify_cli.py <local_repo_dir> <out_dir> [resolution] [ignore_file] [--describe]
 ```
 
-- **Input:** a local folder, or a GitHub address such as `https://github.com/nCoderAI/ncoder-ai.git`. A GitHub address is cloned (shallow) into `<out_dir>/source` on every run.
-- **Output:** `<out_dir>/graph.json`. With `--describe`, also `communities` and a `description` on each node, cached in `descriptions_cache.json`.
+- **Input:** a local folder. Clone a GitHub repository first (`git clone <url> <folder>`), then pass its folder.
+- **Output:** `<out_dir>/graph.json`. With `--describe`, also `communities` and a `description` on each node, cached in `descriptions_cache.json`. The run prints the node, edge and community counts.
 - **Resolution:** the clustering resolution, default `1.0`.
 - **Ignore file:** default `ncoder/graphignore/common.graphifyignore`. Pass another file as the fourth argument.
 - **Descriptions:** without `--describe` there are none. With it, set one of these:
   - Simulated (no network, no cost): `GRAPHIFY_BACKEND=gateway LLM_SIMULATION=true`.
   - Real model: `GRAPHIFY_BACKEND=gateway` with `LITELLM_BASE_URL`, `LITELLM_API_KEY`, `GRAPHIFY_CUSTOMER_ID` and, optionally, `GRAPHIFY_MODEL`. Real calls are billed.
+- **Cache:** each description is cached under its mode (simulated, offline, or the model name), so a run never reuses text from another mode. Changing mode in the same output folder therefore makes real calls for every node.
 
-Example, simulated descriptions of the React repo at a local path:
+Example, simulated descriptions of a local React repo:
 
 ```bash
 GRAPHIFY_BACKEND=gateway LLM_SIMULATION=true .venv/bin/python ncoder/graphify_cli.py \

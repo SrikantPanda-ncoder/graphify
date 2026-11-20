@@ -1,5 +1,5 @@
-"""The run script's input (ncoder/graphify_cli.py, resolve_checkout): a local folder, or a GitHub address cloned into the
-output folder. git is replaced, so no network is used.
+"""The run script takes a local folder (ncoder/graphify_cli.py). A GitHub address is refused with a message, and a
+missing folder is reported; neither starts a build. No network is used.
 
 Run from the repository root: ``python -m pytest tests``.
 """
@@ -12,33 +12,20 @@ _spec = importlib.util.spec_from_file_location("graphify_cli", ROOT / "ncoder" /
 cli = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(cli)
 
-GITHUB = "https://github.com/nCoderAI/ncoder-ai.git"
+
+def test_a_github_address_is_refused(tmp_path, capsys):
+    code = cli.main(["graphify_cli.py", "https://github.com/nCoderAI/ncoder-ai.git", str(tmp_path / "out")])
+    assert code == 2
+    assert "local folder" in capsys.readouterr().err
+    assert not (tmp_path / "out").exists()
 
 
-def test_local_folder_is_used_as_given(tmp_path):
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    assert cli.resolve_checkout(str(repo), tmp_path / "out") == repo.resolve()
+def test_a_missing_folder_is_reported(tmp_path, capsys):
+    code = cli.main(["graphify_cli.py", str(tmp_path / "nowhere"), str(tmp_path / "out")])
+    assert code == 2
+    assert "checkout not found" in capsys.readouterr().err
 
 
-def test_github_address_is_cloned_shallow_into_out_source(tmp_path, monkeypatch):
-    calls = []
-
-    def fake_run(args, check, env):
-        calls.append(args)
-        Path(args[-1]).mkdir(parents=True)
-
-    monkeypatch.setattr(cli.subprocess, "run", fake_run)
-    out = tmp_path / "out"
-    out.mkdir()
-    assert cli.resolve_checkout(GITHUB, out) == out / "source"
-    assert calls == [["git", "clone", "--depth", "1", GITHUB, str(out / "source")]]
-
-
-def test_an_old_source_folder_is_replaced(tmp_path, monkeypatch):
-    out = tmp_path / "out"
-    (out / "source").mkdir(parents=True)
-    (out / "source" / "old.txt").write_text("from an earlier run")
-    monkeypatch.setattr(cli.subprocess, "run", lambda args, check, env: Path(args[-1]).mkdir())
-    cli.resolve_checkout(GITHUB, out)
-    assert not (out / "source" / "old.txt").exists()
+def test_too_few_arguments_print_usage(capsys):
+    assert cli.main(["graphify_cli.py", "only-one"]) == 2
+    assert "usage:" in capsys.readouterr().err
