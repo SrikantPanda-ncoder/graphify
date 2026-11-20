@@ -97,6 +97,8 @@ Install the tagged version: `graphifyy @ git+https://github.com/SrikantPanda-nco
 
 **Outputs:** every node has `start_line` and `end_line` (`null` when unknown). With `--describe` the graph also has a top-level `communities` list (`id`, `name`, `description`, `size`, `members`) and a `description` on each node. Descriptions are cached in `descriptions_cache.json` in the output folder.
 
+**Run a parse:** `python ncoder/graphify_cli.py <repo> <out_dir> [resolution] [ignore_file] [--describe]`, from this repository's root, with the checkout on `PYTHONPATH` (or the package installed). The default ignore file is `ncoder/graphignore/common.graphifyignore`. Use `GRAPHIFY_BACKEND=gateway LLM_SIMULATION=true` with `--describe` for simulated descriptions, or the gateway variables above for real ones. The script works on a copy of the repo, so the repo itself is not modified.
+
 ---
 
 ## See it in action

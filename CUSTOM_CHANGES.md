@@ -87,6 +87,12 @@ Compared with the 0.9.108 wheel, the package has:
 
 - `run_graphify` in `app/services/react_source/graphify_runner.py` builds the environment with `dict(os.environ)`. Setting `GRAPHIFY_LANGUAGE_OVERRIDES` or `GRAPHIFY_TS_RELATIONS` there passes it through. That file lives on `feat/react-source-support`.
 
+## Run script (`ncoder/`)
+
+- `ncoder/graphify_cli.py`: builds graph.json for one repo, with optional simulated or real descriptions (`--describe`). It was in the React checkout and now lives here, so graphify can be tested on its own. It imports only graphify and the standard library.
+- `ncoder/graphignore/common.graphifyignore`: the default ignore list, found next to the script.
+- The React service still calls its own copy in the React checkout until that copy is replaced by this one.
+
 ## Also in this directory
 
 - `build/` and `graphifyy.egg-info/` are build artifacts from the copy. They aren't part of the package and should not be committed.

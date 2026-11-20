@@ -1,0 +1,40 @@
+# Common ignore list for System 9 (used for every repo).
+# Built from the per-repo lists in candidate/system2/ignores. Repo-specific paths are not here.
+
+# version control and dependencies
+.git/
+node_modules/
+
+# build and generated output
+dist/
+build/
+# generated build variants (e.g. qa/dist-weave-route): bundles, not source
+dist-*/
+coverage/
+.next/
+.vitest-reports/
+test-results/
+playwright-report/
+playwright-report-live/
+.tanstack/
+
+# lockfiles
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# binary assets
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.ico
+*.woff
+*.woff2
+*.ttf
+*.eot
+
+# keys and certificates
+*.pem
+*.key
