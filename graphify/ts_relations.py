@@ -353,7 +353,9 @@ def add_ts_relations(paths, root, all_nodes, all_edges) -> dict:
         kept.append(e)
     existing_ids = {n["id"] for n in all_nodes}
     all_nodes.extend(n for n in new_nodes if n["id"] not in existing_ids)
-    all_edges.extend(kept)
+    added, annotated = merge_new_edges(all_edges, kept)
+    all_edges.extend(added)
+    counts["annotated_existing_pairs"] = annotated
     # GRAPHIFY_TS_OVERLAY_OUT=<file> also writes the new relations to a sidecar, for debugging.
     out = os.environ.get("GRAPHIFY_TS_OVERLAY_OUT")
     if out:
@@ -362,6 +364,37 @@ def add_ts_relations(paths, root, all_nodes, all_edges) -> dict:
         with open(out, "w") as f:
             json.dump({"nodes": new_nodes, "edges": kept, "counts": counts}, f)
     return counts
+
+
+def merge_new_edges(all_edges: list, new_edges: list) -> tuple[list, int]:
+    """Split ``new_edges`` into the edges to add, and record the rest on edges that already exist.
+
+    The graph keeps one edge per pair of nodes, whatever its relation, and a later edge with a different relation
+    overwrites an earlier one. So a new relation on a pair that is already linked (by a call, an import or a
+    containment) is not added as an edge. It is recorded on the existing edge as ``ts_relations``, and that edge keeps
+    its own relation. Direction is ignored, so both orders count as the same pair.
+
+    Returns (edges to add, number of relations recorded on existing edges).
+    """
+    host_by_pair: dict = {}
+    for e in all_edges:
+        host_by_pair.setdefault((e.get("source"), e.get("target")), e)
+        host_by_pair.setdefault((e.get("target"), e.get("source")), e)
+    added: list = []
+    annotated = 0
+    for e in new_edges:
+        pair = (e["source"], e["target"])
+        host = host_by_pair.get(pair)
+        if host is None:
+            added.append(e)
+            host_by_pair[pair] = e
+            host_by_pair.setdefault((e["target"], e["source"]), e)
+            continue
+        rels = host.setdefault("ts_relations", [])
+        if e["relation"] not in rels:
+            rels.append(e["relation"])
+        annotated += 1
+    return added, annotated
 
 
 _RULE_A_RELS = {"renders", "calls_hook", "uses_store", "route_renders"}
