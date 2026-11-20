@@ -11410,6 +11410,37 @@ def _extract_sequential(
 _PARALLEL_THRESHOLD = 20
 
 
+def _fill_line_spans(nodes: list, root) -> None:
+    """Give every node ``start_line`` and ``end_line``, whatever its type.
+
+    A node that already has a span (set by the extractor) keeps it. Otherwise: a node with a
+    line location (``L<n>``) starts and ends on that line; a file node spans the whole file
+    (its line count, read from ``root``); a node with no source location gets ``None``.
+    """
+    line_counts: dict = {}
+    for n in nodes:
+        if "start_line" in n and "end_line" in n:
+            continue
+        loc = n.get("source_location") or ""
+        m = re.fullmatch(r"L(\d+)", loc) if isinstance(loc, str) else None
+        start = int(m.group(1)) if m else None
+        end = start
+        sf = n.get("source_file")
+        is_file = bool(sf) and n.get("label") == os.path.basename(str(sf)) and start in (None, 1)
+        if is_file and root is not None:
+            key = str(sf)
+            if key not in line_counts:
+                try:
+                    text = (Path(root) / key).read_text(encoding="utf-8", errors="replace")
+                    line_counts[key] = len(text.splitlines()) or 1
+                except OSError:
+                    line_counts[key] = None
+            if line_counts[key] is not None:
+                start, end = 1, line_counts[key]
+        n.setdefault("start_line", start)
+        n.setdefault("end_line", end)
+
+
 def extract(
     paths: list[Path],
     cache_root: Path | None = None,
@@ -13507,6 +13538,9 @@ def extract(
             _item["definition_file"] = PurePath(_df).as_posix()
 
     _stamp_cpp_condition_provenance(all_nodes, all_edges)
+
+
+    _fill_line_spans(all_nodes, root)
 
     return {
         "nodes": all_nodes,

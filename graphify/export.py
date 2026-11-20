@@ -404,6 +404,11 @@ def to_json(G: nx.Graph, communities: dict[int, list[str]], output_path: str, *,
             # The guard passed; free its copies of both graphs before export.
             del existing_nodes, new_node_list, existing_ids
 
+    # every node carries start_line and end_line; nodes with no source location (e.g. external
+    # references added during the build) get null
+    for _nid in G.nodes:
+        G.nodes[_nid].setdefault("start_line", None)
+        G.nodes[_nid].setdefault("end_line", None)
     node_community = _node_community_map(communities)
     _labels: dict[int, str] = {int(k): v for k, v in (community_labels or {}).items()}
     try:

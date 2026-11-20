@@ -4921,7 +4921,7 @@ def _scan_js_nested_function_declarations(
             if func_name and normalize_id(func_name):
                 line = child.start_point[0] + 1
                 nested_nid = _make_id(parent_nid, func_name)
-                add_node(nested_nid, f"{func_name}()", line)
+                add_node(nested_nid, f"{func_name}()", line, end_line=child.end_point[0] + 1)
                 add_edge(parent_nid, nested_nid, "contains", line)
                 # Record the nesting so a call resolves to the nearest `inner`
                 # in scope, not to whichever same-named function the file-wide
@@ -5006,7 +5006,7 @@ def _scan_python_nested_function_declarations(
             if func_name and normalize_id(func_name):
                 line = target.start_point[0] + 1
                 nested_nid = _make_id(parent_nid, func_name)
-                add_node(nested_nid, f"{func_name}()", line)
+                add_node(nested_nid, f"{func_name}()", line, end_line=target.end_point[0] + 1)
                 add_edge(parent_nid, nested_nid, "contains", line)
                 if callable_def_nids is not None:
                     callable_def_nids.add(nested_nid)
@@ -6872,6 +6872,7 @@ def _ruby_extra_walk(node, source: bytes, file_nid: str, stem: str, str_path: st
         class_nid,
         const_name,
         line,
+        end_line=node.end_point[0] + 1,
         metadata={"ruby_lookup_unsafe": True},
     )
     callable_def_nids.add(class_nid)  # a class is callable (its constructor)
@@ -7268,7 +7269,7 @@ def _extract_generic(
         python_underscore_groups = _python_pre_scan_underscore_collisions(root, source, stem)
 
     def add_node(nid: str, label: str, line: int, *, node_type: str | None = None,
-                 metadata: dict | None = None) -> None:
+                 metadata: dict | None = None, end_line: int | None = None) -> None:
         if nid in seen_ids:
             return
         seen_ids.add(nid)
@@ -7284,6 +7285,10 @@ def _extract_generic(
             "source_file": str_path,
             "source_location": f"L{line}",
         }
+        if end_line is not None:
+            # definition span: start and end line of the declaration (1-based, inclusive)
+            node["start_line"] = line
+            node["end_line"] = end_line
         if node_type:
             node["type"] = node_type
         if merged:
@@ -7637,7 +7642,7 @@ def _extract_generic(
                     metadata = dict(metadata or {})
                     metadata["python_opaque_bases"] = True
             class_nid = decl_node(class_nid, class_name, "type", class_name, line,
-                                  metadata=metadata)
+                                  metadata=metadata, end_line=node.end_point[0] + 1)
             if config.ts_module == "tree_sitter_ruby" and metadata:
                 # Reopened declarations collapse onto the same file-local id;
                 # merge fail-closed markers that add_node intentionally skips.
@@ -8675,7 +8680,7 @@ def _extract_generic(
                         property_name, csharp_member_groups,
                     )
                     if property_nid not in seen_ids:
-                        add_node(property_nid, property_name, property_line)
+                        add_node(property_nid, property_name, property_line, end_line=node.end_point[0] + 1)
                         add_edge(parent_class_nid, property_nid, "defines",
                                  property_line, context="field")
                         # Only the declaration that owns the node: an id
@@ -8930,7 +8935,7 @@ def _extract_generic(
                            if c.type in ("computed_property", "willset_didset_block")]
             if comp_bodies and prop_name:
                 prop_nid = _make_id(parent_class_nid, prop_name)
-                add_node(prop_nid, f".{prop_name}", line)
+                add_node(prop_nid, f".{prop_name}", line, end_line=node.end_point[0] + 1)
                 add_edge(parent_class_nid, prop_nid, "method", line)
                 for body_block in comp_bodies:
                     function_bodies.append((prop_nid, body_block))
@@ -9070,7 +9075,7 @@ def _extract_generic(
                         and any(c.type == "function_declarator" for c in decl.children))
                 )
                 if decl_is_method:
-                    add_node(member_nid, f".{name}()", line)
+                    add_node(member_nid, f".{name}()", line, end_line=decl.end_point[0] + 1)
                     add_edge(parent_class_nid, member_nid, "method", line)
                     callable_def_nids.add(member_nid)
                     cpp_qualified_names[member_nid] = _cpp_qualified_name(node, name, source)
@@ -9242,6 +9247,7 @@ def _extract_generic(
                     func_nid,
                     f".{func_name}()",
                     line,
+                    end_line=node.end_point[0] + 1,
                     metadata=method_metadata,
                 )
                 if (config.ts_module == "tree_sitter_c_sharp" and t == "method_declaration"
@@ -9261,7 +9267,7 @@ def _extract_generic(
                 if not (config.ts_module == "tree_sitter_cpp" and "::" in func_name
                         and cpp_qualified_names.get(func_nid) == _cpp_qualified_name(node, func_name, source)):
                     func_nid = decl_node(func_nid, sanitized_name, "fn",
-                                         f"{func_name}()", line)
+                                         f"{func_name}()", line, end_line=node.end_point[0] + 1)
                 add_edge(file_nid, func_nid, "contains", line)
             callable_def_nids.add(func_nid)  # function / method def is callable
             if config.ts_module == "tree_sitter_cpp" and (parent_class_nid or "::" in func_name):
