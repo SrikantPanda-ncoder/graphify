@@ -83,15 +83,15 @@ Graphify release that produced it.
 
 This fork is nCoder's patch set on graphifyy **0.9.108**. Everything below is off unless you set it, so a run with no new variables matches upstream output. The full list of changes is in [CUSTOM_CHANGES.md](CUSTOM_CHANGES.md).
 
-Install the tagged version: `graphifyy @ git+https://github.com/SrikantPanda-ncoder/graphify@0.9.108+ncoder.1`.
+Install the tagged version: `graphifyy @ git+https://github.com/SrikantPanda-ncoder/graphify@0.9.108+ncoder.2`.
 
 | Variable | What it does |
 |---|---|
 | `GRAPHIFY_LANGUAGE_OVERRIDES` | Per-run extension mapping, for example `tpl=ts,inc=php`. Merged over the repo's `.graphifyrc` and wins on a clash. |
-| `GRAPHIFY_TS_RELATIONS=1` | Adds React/TypeScript edges: `renders`, `calls_hook`, `uses_store`, `route_renders`, `tested_by`, `uses_gql_operation`, and `type_only` on imports. **Known issue:** these edges replace existing edges between the same two nodes (for example `calls` becomes `calls_hook`) rather than adding to them. Leave it off until that is fixed. |
+| `GRAPHIFY_TS_RELATIONS=1` | Adds React/TypeScript relations: `renders`, `calls_hook`, `uses_store`, `route_renders`, `tested_by`, `uses_gql_operation`, and `type_only` on imports. A relation between two nodes that are already linked is not added as a new edge. It is listed in the `ts_relations` field of the existing edge, which keeps its own relation (for example `calls`). Only a relation between a new pair becomes an edge of its own. Queries that filter by relation name should also check `ts_relations`. |
 | `GRAPHIFY_BACKEND=gateway` | Descriptions through the nCoder LLM gateway, used with `--describe`. |
 | `LLM_SIMULATION=true` | With the gateway backend: canned replies, no network. Good for local runs. |
-| `LITELLM_BASE_URL`, `LITELLM_API_KEY`, `GRAPHIFY_CUSTOMER_ID`, `GRAPHIFY_MODEL` | Needed for real calls through the gateway. Every call is attributed to `GRAPHIFY_CUSTOMER_ID`. **Known issue:** the gateway module imports `requests`, which the package does not declare yet, so real calls fail on a fresh install. |
+| `LITELLM_BASE_URL`, `LITELLM_API_KEY`, `GRAPHIFY_CUSTOMER_ID`, `GRAPHIFY_MODEL` | Needed for real calls through the gateway. Every call is attributed to `GRAPHIFY_CUSTOMER_ID`. A missing setting or a 4xx answer fails at once; 429, 5xx and network errors are retried. |
 | `GRAPHIFY_DESCRIPTIONS` | Unset: template descriptions from the structure, no LLM. `llm`: descriptions from the configured backend. |
 | `GRAPHIFY_DESCRIPTION_WORKERS`, `GRAPHIFY_DESCRIPTION_BATCH`, `GRAPHIFY_DESCRIPTIONS_DRY_RUN=1` | Tuning for the description step. The dry run counts requests and tokens and sends nothing. |
 

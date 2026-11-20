@@ -72,12 +72,12 @@ Compared with the 0.9.108 wheel, the package has:
 - A post-pass over TS, TSX and JSX files, derived from the AST and imports.
 - Adds `renders`, `calls_hook`, `uses_store`, `route_renders`, `tested_by` and `uses_gql_operation` edges, and a `type_only` flag on JS/TS import edges.
 - **Off by default.** Enabled only with `GRAPHIFY_TS_RELATIONS=1`. The React graph built on 2026-11-20 has none of these relations, so the flag was off for that run.
-- **Known issue (found 2026-11-20 with a sample React repo):** an added relation replaces any existing edge between the same two nodes instead of sitting beside it. On the sample, 12 existing edges were replaced (9 `calls`, 1 `contains`, 1 `imports`, 1 `imports_from`) and 13 relation edges were added. The pass also logs more edges than the graph keeps. The fix belongs in the dedup step: the key should include the relation.
+- **Relations on an existing pair (fixed in `0.9.108+ncoder.2`).** The graph keeps one edge per pair of nodes, so a new relation on a linked pair used to replace the old edge. On a sample React repo, 12 edges (9 `calls`, 1 `contains`, 1 `imports`, 1 `imports_from`) were lost. Now `merge_new_edges` records the relation in a `ts_relations` list on the existing edge, and adds an edge only for a new pair. Flags off: output unchanged. Trade-off: `renders`, `route_renders` and `tested_by` mostly appear as `ts_relations` entries, not as edges of their own.
 
-## Known issues
+## Fixed in `0.9.108+ncoder.2`
 
-- **`requests` is not declared.** `gateway.py` imports `requests` inside `call_gateway`. The package does not list it, so real gateway calls fail on a fresh install with `ModuleNotFoundError`. Fix: declare it in `pyproject.toml`, or use `urllib`.
-- **Configuration and import errors are retried.** `descriptions_llm.py` retries every exception six times with waits (about six minutes in total). A missing module or a missing gateway setting should fail at once.
+- **`requests` was not declared.** The gateway now uses `urllib` from the standard library, so a fresh install needs no extra package.
+- **Permanent errors were retried.** A missing module, a missing gateway setting or a 4xx answer now fails at once (`GatewayPermanentError` and its subclasses). 429, 5xx and network errors are still retried. A sample run with no keys failed in under a second instead of about six minutes.
 
 ## Not code
 
